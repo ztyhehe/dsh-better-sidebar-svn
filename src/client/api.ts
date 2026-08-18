@@ -79,7 +79,17 @@ export const svnApi = {
   revert: (scope: SessionScope, paths: string[]) =>
     call<{ ok: true }>('svn.revert', scopePayload(scope, { paths })),
 
-  /** 提交变更。 */
+  /** 暂存到待提交列表：adds 中的未版本控制文件会先 svn add（对应 Git stage）。 */
+  stage: (scope: SessionScope, paths: string[], adds: string[] = []) =>
+    call<{ ok: true }>('svn.stage', scopePayload(scope, { adds, paths })),
+
+  /** 取消暂存：不传 paths = 移出待提交列表的全部成员（对应 Git unstage all）。 */
+  unstage: (scope: SessionScope, paths?: string[]) =>
+    call<{ ok: true }>('svn.unstage', scopePayload(scope, {
+      ...(paths !== undefined ? { paths } : {}),
+    })),
+
+  /** 提交待提交列表中的变更（只提交已暂存内容）。 */
   commit: (scope: SessionScope, message: string) =>
     call<{ ok: true }>('svn.commit', scopePayload(scope, { message })),
 
@@ -87,11 +97,12 @@ export const svnApi = {
   update: (scope: SessionScope) =>
     call<{ output: string }>('svn.update', scopePayload(scope, {})),
 
-  /** 提交历史。 */
-  log: (scope: SessionScope, limit?: number, offset?: number) =>
+  /** 提交历史。force = 绕过服务端缓存强制重取（刷新按钮）。 */
+  log: (scope: SessionScope, limit?: number, offset?: number, force?: boolean) =>
     call<SvnLogEntry[]>('svn.log', scopePayload(scope, {
       ...(limit !== undefined ? { limit } : {}),
       ...(offset !== undefined ? { offset } : {}),
+      ...(force === true ? { force: true } : {}),
     })),
 
   /** 获取某版本文件内容。 */

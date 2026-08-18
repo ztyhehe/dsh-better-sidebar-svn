@@ -29,7 +29,15 @@ export declare const svnApi: {
     revert: (scope: SessionScope, paths: string[]) => Promise<{
         ok: true;
     }>;
-    /** 提交变更。 */
+    /** 暂存到待提交列表：adds 中的未版本控制文件会先 svn add（对应 Git stage）。 */
+    stage: (scope: SessionScope, paths: string[], adds?: string[]) => Promise<{
+        ok: true;
+    }>;
+    /** 取消暂存：不传 paths = 移出待提交列表的全部成员（对应 Git unstage all）。 */
+    unstage: (scope: SessionScope, paths?: string[]) => Promise<{
+        ok: true;
+    }>;
+    /** 提交待提交列表中的变更（只提交已暂存内容）。 */
     commit: (scope: SessionScope, message: string) => Promise<{
         ok: true;
     }>;
@@ -37,8 +45,8 @@ export declare const svnApi: {
     update: (scope: SessionScope) => Promise<{
         output: string;
     }>;
-    /** 提交历史。 */
-    log: (scope: SessionScope, limit?: number, offset?: number) => Promise<SvnLogEntry[]>;
+    /** 提交历史。force = 绕过服务端缓存强制重取（刷新按钮）。 */
+    log: (scope: SessionScope, limit?: number, offset?: number, force?: boolean) => Promise<SvnLogEntry[]>;
     /** 获取某版本文件内容。 */
     cat: (scope: SessionScope, rev: string, path: string) => Promise<{
         content: string | null;

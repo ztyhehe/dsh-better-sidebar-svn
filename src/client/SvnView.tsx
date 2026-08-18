@@ -1,17 +1,20 @@
 /**
  * SVN 源代码管理面板：与 dsh-better-sidebar 的 GitView 交互保持一致——
- * 变更列表（行点击开独立 diff 标签页）、提交信息框（Ctrl+Enter）、更新、
- * 历史（懒加载分页，点击看提交 diff）。文件行与历史行带右键菜单
- * （打开编辑器 / 还原 / 复制路径 / 版本号等），危险操作走确认弹窗。
+ * 变更分「已暂存 / 未暂存」两段（SVN 无本地暂存区，用 changelist 模拟：
+ * 行尾 +/− 按钮在两段间移动，提交只提交已暂存内容）。行点击开独立
+ * diff 标签页、提交信息框（Ctrl+Enter）、更新、历史（懒加载分页）。
+ * 文件行与历史行带右键菜单（打开编辑器 / 暂存 / 还原 / 复制路径等），
+ * 危险操作走确认弹窗。
  * 刷新为手动 + 挂载/作用域变化时（无文件监听 - KISS）。
  */
 import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
-  Button, IconCheckOutline16, IconCodeOutline16, IconCopyOutline16, IconDownloadOutline16,
-  IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16, Input, Menu, Modal, writeClipboard,
+  Button, IconBranchOutline16, IconCheckOutline16, IconCodeOutline16, IconCopyOutline16,
+  IconDownloadOutline16, IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16,
+  Input, Menu, Modal, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BetterSidebarService } from 'dsh-better-sidebar'
-import type { SvnLogEntry, SvnStatusEntry, SvnStatusResult } from '../types.js'
+import { STAGE_CHANGELIST, type SvnLogEntry, type SvnStatusEntry, type SvnStatusResult } from '../types.js'
 import type { SessionScope } from './api.ts'
 import { svnApi } from './api.ts'
 
@@ -82,6 +85,20 @@ interface ConfirmState {
 /** 历史批次大小（懒加载分页）。 */
 const LOG_BATCH = 20
 
+/** 历史快照（模块级缓存，切换会话 / 面板卸载重挂载不丢失）。
+ *  key 为 cwd（同一仓库共享；无 cwd 时退回会话 id）。挂载时先上屏快照，
+ *  再向 host 求值（host 命中缓存时零网络），刷新按钮 force 强制重取。 */
+interface LogSnapshot {
+  entries: SvnLogEntry[]
+  ended: boolean
+}
+
+const logSnapshots = new Map<string, LogSnapshot>()
+
+function logSnapshotKey(scope: SessionScope): string {
+  return scope.cwd !== undefined && scope.cwd !== '' ? `cwd:${scope.cwd}` : `session:${scope.sessionId}`
+}
+
 export interface SvnViewProps {
   scope: SessionScope
   betterSidebar: BetterSidebarService
@@ -100,26 +117,25 @@ export function SvnView(props: SvnViewProps) {
   /** 历史是否已翻到底（批次短于 LOG_BATCH）。 */
   const [logEnded, setLogEnded] = useState(false)
   const [logLoadingMore, setLogLoadingMore] = useState(false)
+  /** 历史第一页是否在加载中（独立于状态区的 loading）。 */
+  const [logLoading, setLogLoading] = useState(true)
 
-  /** 打开中的文件行右键菜单（光标位置，portal 菜单用）。 */
-  const [fileMenu, setFileMenu] = useState<{ entry: SvnStatusEntry; x: number; y: number } | null>(null)
+  /** 打开中的文件行右键菜单（staged = 该行来自「已暂存」段）。 */
+  const [fileMenu, setFileMenu] = useState<{ entry: SvnStatusEntry; staged: boolean; x: number; y: number } | null>(null)
   /** 打开中的历史行右键菜单。 */
   const [historyMenu, setHistoryMenu] = useState<{ entry: SvnLogEntry; x: number; y: number } | null>(null)
   /** 待确认的危险操作。 */
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
 
-  const refresh = useCallback(async (): Promise<void> => {
+  /**
+   * 刷新状态区（`svn status` 纯本地读 wc.db，几十毫秒即回）。
+   * 与历史加载拆分：首屏只等本命令，`svn log` 的网络往返不再拖住整个面板。
+   */
+  const refreshStatus = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(null)
     try {
-      const [statusResult, logResult] = await Promise.all([
-        svnApi.status(scope),
-        // 只取历史第一页，其余通过「加载更多」补齐。
-        svnApi.log(scope, LOG_BATCH, 0).catch(() => [] as SvnLogEntry[]),
-      ])
-      setStatus(statusResult)
-      setLogEntries(logResult)
-      setLogEnded(logResult.length < LOG_BATCH)
+      setStatus(await svnApi.status(scope))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -127,16 +143,55 @@ export function SvnView(props: SvnViewProps) {
     }
   }, [scope.sessionId, scope.cwd])
 
-  useEffect(() => { void refresh() }, [refresh])
+  /** 刷新历史第一页（`svn log` 需访问仓库服务器，慢）。
+   *  先上屏模块级快照（切换会话回来立即可见），再向 host 求值：
+   *  host 缓存命中时零网络；force = true 绕过缓存强制重取。 */
+  const refreshLog = useCallback(async (force = false): Promise<void> => {
+    const key = logSnapshotKey(scope)
+    const snapshot = logSnapshots.get(key)
+    if (snapshot !== undefined) {
+      setLogEntries(snapshot.entries)
+      setLogEnded(snapshot.ended)
+    }
+    setLogLoading(true)
+    try {
+      const logResult = await svnApi.log(scope, LOG_BATCH, 0, force)
+      const ended = logResult.length < LOG_BATCH
+      setLogEntries(logResult)
+      setLogEnded(ended)
+      logSnapshots.set(key, { entries: logResult, ended })
+    } catch {
+      // 与 Git 面板对称：历史加载失败不打断状态区；已有快照时保留旧数据
+      if (snapshot === undefined) {
+        setLogEntries([])
+        setLogEnded(true)
+      }
+    } finally {
+      setLogLoading(false)
+    }
+  }, [scope.sessionId, scope.cwd])
 
-  /** 追加下一页历史（仅当用户要求更多时）。 */
+  useEffect(() => {
+    void refreshStatus()
+    void refreshLog()
+  }, [refreshStatus, refreshLog])
+
+  /** 手动刷新 / 操作后刷新：两路各自独立 set 状态，快的先上屏。 */
+  const refresh = useCallback(async (forceLog = false): Promise<void> => {
+    await Promise.all([refreshStatus(), refreshLog(forceLog)])
+  }, [refreshStatus, refreshLog])
+
+  /** 追加下一页历史（仅当用户要求更多时），并同步到模块级快照。 */
   const loadMoreLog = async (): Promise<void> => {
     if (logLoadingMore || logEnded) return
     setLogLoadingMore(true)
     try {
       const next = await svnApi.log(scope, LOG_BATCH, logEntries.length)
-      setLogEntries(entries => [...entries, ...next])
-      if (next.length < LOG_BATCH) setLogEnded(true)
+      const merged = [...logEntries, ...next]
+      const ended = next.length < LOG_BATCH
+      setLogEntries(merged)
+      setLogEnded(ended)
+      logSnapshots.set(logSnapshotKey(scope), { entries: merged, ended })
     } catch (reason) {
       setActionError(`历史加载失败: ${reason instanceof Error ? reason.message : String(reason)}`)
     } finally {
@@ -174,9 +229,33 @@ export function SvnView(props: SvnViewProps) {
     }
   }
 
+  /** 暂存一个条目到待提交列表（未版本控制文件自动先 svn add）。 */
+  const stageEntry = (entry: SvnStatusEntry): void => {
+    void runAction(() => svnApi.stage(scope, [entry.path], entry.status === 'unversioned' ? [entry.path] : []))
+  }
+
+  /** 取消暂存一个条目。 */
+  const unstageEntry = (entry: SvnStatusEntry): void => {
+    void runAction(() => svnApi.unstage(scope, [entry.path]))
+  }
+
+  /** 全部暂存：可暂存的未暂存条目（冲突需先解决、丢失除外）一次入列。 */
+  const stageAll = (): void => {
+    const staggable = unstagedEntries.filter(e => e.status !== 'conflicted' && e.status !== 'missing')
+    if (staggable.length === 0) return
+    const adds = staggable.filter(e => e.status === 'unversioned').map(e => e.path)
+    const paths = staggable.filter(e => e.status !== 'unversioned').map(e => e.path)
+    void runAction(() => svnApi.stage(scope, paths, adds))
+  }
+
+  /** 全部取消暂存（清空待提交列表）。 */
+  const unstageAll = (): void => {
+    void runAction(() => svnApi.unstage(scope))
+  }
+
   const commit = async (): Promise<void> => {
     const message = commitMsg.trim()
-    if (message === '' || busy || committableEntries.length === 0) return
+    if (message === '' || busy || stagedEntries.length === 0) return
     setBusy(true)
     setActionError(null)
     try {
@@ -210,10 +289,10 @@ export function SvnView(props: SvnViewProps) {
     void writeClipboard(text)
   }
 
-  const openFileMenu = (event: MouseEvent, entry: SvnStatusEntry): void => {
+  const openFileMenu = (event: MouseEvent, entry: SvnStatusEntry, staged: boolean): void => {
     event.preventDefault()
     event.stopPropagation()
-    setFileMenu({ entry, x: event.clientX, y: event.clientY })
+    setFileMenu({ entry, staged, x: event.clientX, y: event.clientY })
   }
 
   const openHistoryMenu = (event: MouseEvent, entry: SvnLogEntry): void => {
@@ -223,18 +302,23 @@ export function SvnView(props: SvnViewProps) {
   }
 
   const changedEntries = (status?.entries ?? []).filter(e => e.status !== 'normal')
-  const committableEntries = changedEntries.filter(isVersionedChange)
+  /** 已暂存：待提交 changelist 的成员（提交只提交这些）。 */
+  const stagedEntries = changedEntries.filter(e => e.changelist === STAGE_CHANGELIST)
+  /** 未暂存：其余变更（含未版本控制 / 冲突 / 丢失，与 Git 的 unstaged 段对应）。 */
+  const unstagedEntries = changedEntries.filter(e => e.changelist !== STAGE_CHANGELIST)
+  /** 未暂存段中可一键暂存的数量（冲突需先解决、丢失除外）。 */
+  const staggableCount = unstagedEntries.filter(e => e.status !== 'conflicted' && e.status !== 'missing').length
 
-  const renderEntry = (entry: SvnStatusEntry): ReactNode => {
+  const renderEntry = (entry: SvnStatusEntry, staged: boolean): ReactNode => {
     const badge = STATUS_LABELS[entry.status] ?? entry.status
     return (
-      <div key={entry.path} className="svn-row">
+      <div key={`${staged ? 's' : 'u'}:${entry.path}`} className="svn-row">
         <button
           type="button"
           className="svn-row-main"
           title={entry.path}
           onClick={() => { openWorktreeDiff(entry) }}
-          onContextMenu={(event) => { openFileMenu(event, entry) }}
+          onContextMenu={(event) => { openFileMenu(event, entry, staged) }}
         >
           <span className={`svn-badge ${STATUS_CLASSES[entry.status] ?? ''}`}>{badge}</span>
           <span className="svn-name">{entry.path}</span>
@@ -242,16 +326,23 @@ export function SvnView(props: SvnViewProps) {
         <button
           type="button"
           className="svn-iconbtn"
-          aria-label={inlineLabel(entry)}
-          title={inlineLabel(entry)}
+          aria-label={inlineLabel(entry, staged)}
+          title={inlineLabel(entry, staged)}
           disabled={busy}
           onClick={() => {
-            if (entry.status === 'unversioned') void runAction(() => svnApi.add(scope, [entry.path]))
-            else if (entry.status === 'conflicted') void runAction(() => svnApi.resolve(scope, entry.path))
-            else openWorktreeDiff(entry)
+            if (staged) {
+              unstageEntry(entry)
+            } else if (entry.status === 'conflicted') {
+              void runAction(() => svnApi.resolve(scope, entry.path))
+            } else if (entry.status === 'missing') {
+              openWorktreeDiff(entry)
+            } else {
+              // 未版本控制（暂存时自动先 svn add）与普通变更 alike：一键入列。
+              stageEntry(entry)
+            }
           }}
         >
-          {inlineIcon(entry)}
+          {inlineIcon(entry, staged)}
         </button>
       </div>
     )
@@ -280,7 +371,7 @@ export function SvnView(props: SvnViewProps) {
             className="svn-iconbtn"
             aria-label="刷新"
             title="刷新"
-            onClick={() => { void refresh() }}
+            onClick={() => { void refresh(true) }}
           >
             <IconRefreshOutline16 size={14} />
           </button>
@@ -297,16 +388,34 @@ export function SvnView(props: SvnViewProps) {
         <>
           <div className="svn-section">
             <div className="svn-section-header">
-              <span>{`变更 (${changedEntries.length})`}</span>
+              <span>{`已暂存 (${stagedEntries.length})`}</span>
+              {stagedEntries.length > 0 && (
+                <button type="button" className="svn-link" disabled={busy} onClick={() => { unstageAll() }}>
+                  全部取消暂存
+                </button>
+              )}
             </div>
-            {changedEntries.length === 0 && <div className="svn-empty">无变更</div>}
-            {changedEntries.map(entry => renderEntry(entry))}
+            {stagedEntries.length === 0 && <div className="svn-empty">无暂存变更</div>}
+            {stagedEntries.map(entry => renderEntry(entry, true))}
+          </div>
+
+          <div className="svn-section">
+            <div className="svn-section-header">
+              <span>{`未暂存 (${unstagedEntries.length})`}</span>
+              {staggableCount > 0 && (
+                <button type="button" className="svn-link" disabled={busy} onClick={() => { stageAll() }}>
+                  全部暂存
+                </button>
+              )}
+            </div>
+            {unstagedEntries.length === 0 && <div className="svn-empty">无变更</div>}
+            {unstagedEntries.map(entry => renderEntry(entry, false))}
           </div>
 
           <div className="svn-commit">
             <Input
               className="svn-commit-input"
-              placeholder="提交信息（Ctrl+Enter 提交）"
+              placeholder="提交信息（Ctrl+Enter 提交已暂存）"
               value={commitMsg}
               disabled={busy}
               onChange={(event) => { setCommitMsg(event.target.value); setActionError(null) }}
@@ -317,8 +426,8 @@ export function SvnView(props: SvnViewProps) {
             <button
               type="button"
               className="svn-btn svn-btn-primary"
-              disabled={busy || commitMsg.trim() === '' || committableEntries.length === 0}
-              title={committableEntries.length === 0 ? '没有已版本控制的变更可提交' : undefined}
+              disabled={busy || commitMsg.trim() === '' || stagedEntries.length === 0}
+              title={stagedEntries.length === 0 ? '没有已暂存的变更可提交（先点 + 暂存要提交的文件）' : undefined}
               onClick={() => { void commit() }}
             >
               提交
@@ -328,6 +437,8 @@ export function SvnView(props: SvnViewProps) {
 
           <div className="svn-section">
             <div className="svn-section-header"><span>历史</span></div>
+            {logLoading && logEntries.length === 0 && <div className="svn-empty">历史加载中...</div>}
+            {!logLoading && logEntries.length === 0 && <div className="svn-empty">无历史</div>}
             {logEntries.map(entry => (
               <div
                 key={entry.revision}
@@ -374,8 +485,19 @@ export function SvnView(props: SvnViewProps) {
             items={[
               { id: 'open', label: '在编辑器中打开', icon: <IconCodeOutline16 size={14} /> },
               { id: 'diff', label: '查看变更' },
+              ...(fileMenu !== null && fileMenu.staged
+                ? [{ id: 'unstage', label: '取消暂存', icon: <IconTrashOutline16 size={14} /> }]
+                : []),
+              ...(fileMenu !== null && !fileMenu.staged
+                && fileMenu.entry.status !== 'conflicted' && fileMenu.entry.status !== 'missing'
+                ? [{
+                    id: 'stage',
+                    label: fileMenu.entry.status === 'unversioned' ? '添加并暂存' : '暂存',
+                    icon: <IconBranchOutline16 size={14} />,
+                  }]
+                : []),
               ...(fileMenu !== null && fileMenu.entry.status === 'unversioned'
-                ? [{ id: 'add', label: '添加到版本控制', icon: <IconPlusOutline16 size={14} /> }]
+                ? [{ id: 'add', label: '仅添加到版本控制', icon: <IconPlusOutline16 size={14} /> }]
                 : []),
               ...(fileMenu !== null && fileMenu.entry.status === 'conflicted'
                 ? [{ id: 'resolve', label: '解决冲突（保留当前）', icon: <IconCheckOutline16 size={14} /> }]
@@ -397,6 +519,14 @@ export function SvnView(props: SvnViewProps) {
               }
               if (id === 'diff') {
                 openWorktreeDiff(target.entry)
+                return
+              }
+              if (id === 'stage') {
+                stageEntry(target.entry)
+                return
+              }
+              if (id === 'unstage') {
+                unstageEntry(target.entry)
                 return
               }
               if (id === 'add') {
@@ -508,16 +638,20 @@ function firstLine(message: string): string {
   return (index === -1 ? message : message.slice(0, index)).trim()
 }
 
-/** 行内 hover 按钮的语义标签。 */
-function inlineLabel(entry: SvnStatusEntry): string {
-  if (entry.status === 'unversioned') return '添加到版本控制'
+/** 行内 hover 按钮的语义标签（与 GitView 的 stage/unstage 对称）。 */
+function inlineLabel(entry: SvnStatusEntry, staged: boolean): string {
+  if (staged) return '取消暂存'
+  if (entry.status === 'unversioned') return '添加并暂存'
   if (entry.status === 'conflicted') return '解决冲突（保留当前）'
-  return '查看变更'
+  if (entry.status === 'missing') return '查看变更'
+  return '暂存'
 }
 
-/** 行内 hover 按钮的图标。 */
-function inlineIcon(entry: SvnStatusEntry): ReactNode {
+/** 行内 hover 按钮的图标（GitView：暂存用分支形、取消暂存用垃圾桶）。 */
+function inlineIcon(entry: SvnStatusEntry, staged: boolean): ReactNode {
+  if (staged) return <IconTrashOutline16 />
   if (entry.status === 'unversioned') return <IconPlusOutline16 />
   if (entry.status === 'conflicted') return <IconCheckOutline16 />
-  return <IconCodeOutline16 />
+  if (entry.status === 'missing') return <IconCodeOutline16 />
+  return <IconBranchOutline16 />
 }

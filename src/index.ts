@@ -7,7 +7,9 @@
  *  - svn.diff      → 文件 diff 文本
  *  - svn.add       → 添加文件到版本控制
  *  - svn.revert     → 还原文件修改
- *  - svn.commit     → 提交变更
+ *  - svn.stage      → 暂存到待提交列表（changelist；未版本控制文件自动先 add）
+ *  - svn.unstage    → 取消暂存（不传 paths = 全部取消）
+ *  - svn.commit     → 提交待提交列表中的变更（--changelist，只提交已暂存）
  *  - svn.update     → 更新工作副本
  *  - svn.log        → 提交历史（分页）
  *  - svn.cat        → 获取某版本文件内容
@@ -84,26 +86,50 @@ function buildApi(ctx: Context): Record<string, ApiMethod> {
       await svn.revert(cwd, paths)
       return { ok: true }
     },
+    'svn.stage': async (payload) => {
+      const { cwd } = cwdOf(ctx, payload)
+      const record = payload as { adds?: unknown; paths?: unknown }
+      const adds: string[] = Array.isArray(record.adds) ? record.adds.filter((p): p is string => typeof p === 'string') : []
+      const paths: string[] = Array.isArray(record.paths) ? record.paths.filter((p): p is string => typeof p === 'string') : []
+      if (adds.length === 0 && paths.length === 0) throw new SidebarError('bad-request', '"paths" or "adds" must be a non-empty array of strings')
+      await svn.stage(cwd, adds, paths)
+      return { ok: true }
+    },
+    'svn.unstage': async (payload) => {
+      const { cwd } = cwdOf(ctx, payload)
+      const record = payload as { paths?: unknown }
+      // paths 缺省或空数组 = 移出待提交列表的全部成员（对应 Git 的 unstage all）
+      const paths: string[] = Array.isArray(record.paths) ? record.paths.filter((p): p is string => typeof p === 'string') : []
+      await svn.unstage(cwd, paths)
+      return { ok: true }
+    },
     'svn.commit': async (payload) => {
       const { cwd } = cwdOf(ctx, payload)
       const message = requireString(payload, 'message')
       await svn.commit(cwd, message)
+      // 提交产生新版本，历史缓存立即失效
+      svn.invalidateLogCache(cwd)
       return { ok: true }
     },
     'svn.update': async (payload) => {
       const { cwd } = cwdOf(ctx, payload)
-      return { output: await svn.update(cwd) }
+      const output = await svn.update(cwd)
+      // 更新可能拉入他人提交（rHEAD 变化），历史缓存失效
+      svn.invalidateLogCache(cwd)
+      return { output }
     },
     'svn.log': async (payload) => {
       const { cwd } = cwdOf(ctx, payload)
-      const record = payload as { limit?: unknown; offset?: unknown }
+      const record = payload as { limit?: unknown; offset?: unknown; force?: unknown }
       const limit = typeof record.limit === 'number' && Number.isInteger(record.limit) && record.limit > 0
         ? record.limit
         : 30
       const offset = typeof record.offset === 'number' && Number.isInteger(record.offset) && record.offset >= 0
         ? record.offset
         : 0
-      return svn.log(cwd, limit, offset)
+      // force：绕过缓存强制重取（刷新按钮）；默认命中缓存即返回
+      const force = record.force === true
+      return svn.log(cwd, limit, offset, force)
     },
     'svn.cat': async (payload) => {
       const { cwd } = cwdOf(ctx, payload)
@@ -127,6 +153,8 @@ function buildApi(ctx: Context): Record<string, ApiMethod> {
       const { cwd } = cwdOf(ctx, payload)
       const revision = requireString(payload, 'revision')
       await svn.revertRevision(cwd, revision)
+      // 撤销改动落回工作副本（不产生新提交），但保险起见失效缓存
+      svn.invalidateLogCache(cwd)
       return { ok: true }
     },
   }

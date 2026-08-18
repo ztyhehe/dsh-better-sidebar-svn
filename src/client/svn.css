@@ -124,6 +124,25 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* 分段头右侧的操作链接（全部暂存 / 全部取消暂存），与 GitView 的 gitLink 对称。 */
+.svn-link {
+  border: none;
+  background: transparent;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.svn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.svn-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .svn-empty {
   padding: 4px 12px 8px;
   font: var(--dsw-font-xxs-12);
@@ -419,6 +438,7 @@
 /* 焦点可见性 */
 .svn-iconbtn:focus-visible,
 .svn-btn:focus-visible,
+.svn-link:focus-visible,
 .svn-row-main:focus-visible,
 .svn-log-row:focus-visible,
 .svn-log-more:focus-visible,
