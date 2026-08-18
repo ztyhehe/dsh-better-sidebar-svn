@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "declarationDir": "lib/types"
+  },
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx", "src/types.ts", "src/css.d.ts"]
+}

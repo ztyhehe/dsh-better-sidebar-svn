@@ -1,0 +1,428 @@
+/**
+ * SVN 面板样式：与 better-sidebar 的 GitView 视觉风格保持一致。
+ * 全部颜色使用 dsw 设计令牌（--dsw-alias-* / --dsw-font-*），自动适配亮/暗主题。
+ * 使用 svn- 前缀避免与内置样式冲突。
+ */
+
+.svn-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+
+.svn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  height: 36px;
+  padding: 0 8px 0 12px;
+}
+
+.svn-branch {
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.svn-revision {
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.svn-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--dsw-alias-label-secondary);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  flex: none;
+  padding: 0;
+}
+
+.svn-iconbtn:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-iconbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.svn-btn {
+  padding: 3px 12px;
+  font: var(--dsw-font-xxs-strong-12);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.svn-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.svn-btn-primary {
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-inverted);
+}
+
+.svn-btn-primary:hover:not(:disabled) {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+.svn-placeholder {
+  padding: 16px;
+  text-align: center;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-error {
+  padding: 8px 12px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-state-error-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.svn-section {
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.svn-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 4px;
+  font: var(--dsw-font-xxxs-strong-11);
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-empty {
+  padding: 4px 12px 8px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 0 6px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.svn-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.svn-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 3px 0;
+  color: inherit;
+  font: inherit;
+}
+
+.svn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  font: var(--dsw-font-xxxs-strong-11);
+  border-radius: 4px;
+  flex: none;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.svn-status-modified {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.svn-status-added {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.svn-status-deleted {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.svn-status-conflicted {
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 25%, transparent);
+}
+
+.svn-status-replaced {
+  color: var(--dsw-alias-brand-primary);
+}
+
+.svn-status-unversioned {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-status-missing {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.svn-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-commit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.svn-commit-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.svn-log-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 0 6px;
+}
+
+.svn-log-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.svn-log-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.svn-log-revision {
+  font: var(--dsw-font-markdown-code-block-small);
+  color: var(--dsw-alias-label-tertiary);
+  flex: none;
+}
+
+.svn-log-message {
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svn-log-line2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.svn-log-meta {
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.svn-log-more {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 4px 12px 8px;
+  padding: 6px 0;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  background: none;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.svn-log-more:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-log-more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.svn-confirm-desc {
+  margin: 0;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
+}
+
+/* ── 独立 diff 标签页 ─────────────────────────────────────────────── */
+
+.svn-difftab {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  font: var(--dsw-font-markdown-code-block-small);
+  background: var(--dsw-alias-bg-base);
+}
+
+.svn-difftab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 36px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.svn-difftab-title {
+  font: var(--dsw-font-xxs-strong-12);
+  color: var(--dsw-alias-label-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svn-diff-file {
+  padding: 8px 2px 2px;
+}
+
+.svn-diff-fileheader {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 2px 2px;
+}
+
+.svn-diff-filepath {
+  font: var(--dsw-font-xxs-strong-12);
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svn-diff-fileold {
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: none;
+  max-width: 40%;
+}
+
+.svn-diff-hunk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 3px 2px;
+}
+
+.svn-diff-line {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  line-height: 20px;
+}
+
+.svn-diff-num {
+  width: 36px;
+  flex: none;
+  text-align: right;
+  padding-right: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  user-select: none;
+}
+
+.svn-diff-code {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.svn-diff-ctx {
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-diff-del {
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);
+}
+
+.svn-diff-add {
+  color: var(--dsw-alias-state-success-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent);
+}
+
+.svn-diff-meta {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* 焦点可见性 */
+.svn-iconbtn:focus-visible,
+.svn-btn:focus-visible,
+.svn-row-main:focus-visible,
+.svn-log-row:focus-visible,
+.svn-log-more:focus-visible,
+.svn-commit-input:focus-visible {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: -1px;
+}

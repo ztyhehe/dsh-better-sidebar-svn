@@ -1,0 +1,7 @@
+# dsh-better-sidebar-svn bundle patch
+#
+# 当通过 dsh plugin 命令安装时，此文件告知 DSH 将本插件加入到
+# profile 的 bundle stack 中，无需手动编辑 cordis.patch.yml。
+- insert:
+    - id: better-sidebar-svn
+      name: 'dsh-better-sidebar-svn'
