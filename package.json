@@ -1,6 +1,6 @@
 {
   "name": "dsh-better-sidebar-svn",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH better-sidebar 插件：为侧边栏添加 SVN 源代码管理面板，支持 status / diff / log / commit / update / revert 等常用操作",
   "type": "module",
   "repository": {
@@ -71,7 +71,11 @@
   "scripts": {
     "build": "rm -rf lib && tsc -p tsconfig.build.json && tsc -p tsconfig.client.json && node scripts/bundle-client.mjs",
     "typecheck": "tsc --noEmit",
-    "watch": "node scripts/bundle-client.mjs --watch"
+    "test": "node --test tests/*.test.ts",
+    "watch": "node scripts/bundle-client.mjs --watch",
+    "preversion": "pnpm typecheck && pnpm test",
+    "version": "pnpm build",
+    "postversion": "git push --follow-tags"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

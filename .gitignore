@@ -3,3 +3,13 @@
 node_modules/
 *.log
 .DS_Store
+
+# 本地覆盖 / 密钥 / 环境变量
+*.local*
+.local.*
+secrets/
+.env
+.env.*
+
+# 测试与覆盖率产物
+coverage/
