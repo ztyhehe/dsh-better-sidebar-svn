@@ -1,4 +1,35 @@
-import { type SvnLogEntry, type SvnStatusResult } from './types.ts';
+import { type SvnLogEntry, type SvnLogPath, type SvnStatusResult } from './types.ts';
+/** `svn` 二进制缺失 / 无法运行时的统一错误码与可读文案。 */
+export declare const SVN_MISSING_MESSAGE = "\u7CFB\u7EDF\u672A\u5B89\u88C5 svn \u547D\u4EE4\u884C\uFF0C\u8BF7\u5B89\u88C5\u540E\u91CD\u8BD5";
+/** 用正则从 XML 中提取 `<entry>` 块的内容（轻量级，不依赖完整 XML 解析器）。 */
+export declare function extractTag(content: string, tag: string): string | undefined;
+/** 提取指定元素的开始标签上的属性值，如 `<commit revision="...">`。 */
+export declare function extractAttr(content: string, element: string, attr: string): string | undefined;
+/** 从 XML 中提取所有 `<entry>` 块（含开始标签与整体位置，用于归属 changelist 容器）。 */
+export declare function extractEntries(xml: string): {
+    xml: string;
+    start: number;
+    end: number;
+}[];
+/** 提取所有 `<changelist name="...">` 容器的名字与区间（成员 entry 落在其内即归属该列表）。 */
+export declare function extractChangelistSpans(xml: string): {
+    name: string;
+    start: number;
+    end: number;
+}[];
+/** 从 XML 中提取所有 `<logentry>` 块（含开始标签，以读取 revision 属性）。 */
+export declare function extractLogEntries(xml: string): string[];
+/** 从 `<path>` 元素中提取变更信息。 */
+export declare function extractPaths(entryXml: string): SvnLogPath[];
+/** 在 `<info>` 中提取 `<entry>` 块（含开始标签，以读取 revision 属性）。 */
+export declare function extractInfoEntry(xml: string): string | undefined;
+/** 解码 `svn --xml` 输出中最常见的实体。 */
+export declare function decodeXmlText(text: string): string;
+/** 从 `svn prop* --xml` 输出中提取指定 property 的文本值。 */
+export declare function extractPropertyValue(xml: string, propertyName: string): string | undefined;
+export declare function ensureSvnAvailable(): Promise<true>;
+/** 写操作目标锁定：把 cwd 解析为 realpath，避免相对路径/软链把 svn:ignore 写到工作副本外。 */
+export declare function lockCwd(cwd: string): Promise<string>;
 /** 判断目录是否在 SVN 工作副本中。 */
 export declare function isSvnRepo(cwd: string): Promise<boolean>;
 /** 获取 SVN 工作副本信息（`svn info --xml`）。 */
@@ -38,10 +69,20 @@ export declare function update(cwd: string): Promise<string>;
 export declare function log(cwd: string, limit?: number, offset?: number, force?: boolean): Promise<SvnLogEntry[]>;
 /** 失效某工作副本的历史缓存（commit / update / 撤销提交后调用）。 */
 export declare function invalidateLogCache(cwd: string): void;
+/** 解析 `svn log --xml` 输出。 */
+export declare function parseLog(xml: string): SvnLogEntry[];
 /** 获取某个版本的文件内容（`svn cat -r REV PATH`）。 */
 export declare function cat(cwd: string, rev: string, path: string): Promise<string | null>;
 /** 解决冲突（接受当前版本）。 */
 export declare function resolve(cwd: string, path: string, accept?: 'base' | 'working' | 'mine-conflict' | 'theirs-conflict' | 'mine-full' | 'theirs-full'): Promise<void>;
 /** 撤销某次提交（`svn merge -c -REV`，等价 `git revert`），改动落回工作副本待提交。 */
 export declare function revertRevision(cwd: string, revision: string): Promise<void>;
+/** 读取当前工作副本目录的 `svn:ignore`（不递归、不包含继承属性）。 */
+export declare function ignoreGet(cwd: string): Promise<string[]>;
+/** 写入当前工作副本目录的 `svn:ignore`：
+ *  - 非空规则经临时文件 `propset svn:ignore -F <tmp> .`（避免转义 / 命令行长度问题）；
+ *  - 清空规则走 `propdel`（`propset` 空串不等价于删除属性，属性必须真正删除）。
+ *  目标 cwd 先 realpath 锁定，避免相对路径 / 软链写到工作副本外。
+ */
+export declare function ignoreSet(cwd: string, rules: readonly string[]): Promise<string[]>;
 //# sourceMappingURL=svn.d.ts.map

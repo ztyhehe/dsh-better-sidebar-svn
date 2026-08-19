@@ -8,6 +8,8 @@ export declare class SvnApiError extends Error {
     readonly code: string;
     constructor(code: string, message: string);
 }
+/** 把后端错误码映射为前端可直接展示的友好文案。 */
+export declare function friendlySvnMessage(reason: unknown): string;
 /** 会话作用域（与 better-sidebar 的 SessionScope 兼容）。 */
 export interface SessionScope {
     sessionId: string;
@@ -60,6 +62,15 @@ export declare const svnApi: {
     /** 撤销某次提交（改动落回工作副本）。 */
     revertRevision: (scope: SessionScope, revision: string) => Promise<{
         ok: true;
+    }>;
+    /** 读取当前目录的 svn:ignore 规则（按行拆分）。 */
+    ignoreGet: (scope: SessionScope) => Promise<{
+        rules: string[];
+    }>;
+    /** 写入当前目录的 svn:ignore：空数组 = 删除 svn:ignore 属性。 */
+    ignoreSet: (scope: SessionScope, rules: string[]) => Promise<{
+        ok: true;
+        rules: string[];
     }>;
 };
 //# sourceMappingURL=api.d.ts.map
