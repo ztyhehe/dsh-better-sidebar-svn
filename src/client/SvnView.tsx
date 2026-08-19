@@ -10,13 +10,13 @@
 import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   Button, IconBranchOutline16, IconCheckOutline16, IconCodeOutline16, IconCopyOutline16,
-  IconDownloadOutline16, IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16,
+  IconDownloadOutline16, IconListPenOutline16, IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16,
   Input, Menu, Modal, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BetterSidebarService } from 'dsh-better-sidebar'
 import { STAGE_CHANGELIST, type SvnLogEntry, type SvnStatusEntry, type SvnStatusResult } from '../types.js'
 import type { SessionScope } from './api.ts'
-import { svnApi } from './api.ts'
+import { friendlySvnMessage, SvnApiError, svnApi } from './api.ts'
 
 /** SVN 状态字母（badge 展示）。 */
 const STATUS_LABELS: Record<string, string> = {
@@ -126,6 +126,14 @@ export function SvnView(props: SvnViewProps) {
   const [historyMenu, setHistoryMenu] = useState<{ entry: SvnLogEntry; x: number; y: number } | null>(null)
   /** 待确认的危险操作。 */
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  /** svn 二进制缺失降级提示（后端 svn-missing → 友好占位）。 */
+  const [svnMissing, setSvnMissing] = useState(false)
+  /** 「忽略规则」弹窗 state。 */
+  const [ignoreOpen, setIgnoreOpen] = useState(false)
+  const [ignoreText, setIgnoreText] = useState('')
+  const [ignoreLoading, setIgnoreLoading] = useState(false)
+  const [ignoreSaving, setIgnoreSaving] = useState(false)
+  const [ignoreError, setIgnoreError] = useState<string | null>(null)
 
   /**
    * 刷新状态区（`svn status` 纯本地读 wc.db，几十毫秒即回）。
@@ -136,8 +144,10 @@ export function SvnView(props: SvnViewProps) {
     setError(null)
     try {
       setStatus(await svnApi.status(scope))
+      setSvnMissing(false)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      setSvnMissing(reason instanceof SvnApiError && reason.code === 'svn-missing')
+      setError(friendlySvnMessage(reason))
     } finally {
       setLoading(false)
     }
@@ -181,6 +191,38 @@ export function SvnView(props: SvnViewProps) {
     await Promise.all([refreshStatus(), refreshLog(forceLog)])
   }, [refreshStatus, refreshLog])
 
+  /** 打开「忽略规则」弹窗并读取当前目录 svn:ignore。 */
+  const openIgnoreModal = async (): Promise<void> => {
+    setIgnoreOpen(true)
+    setIgnoreLoading(true)
+    setIgnoreError(null)
+    setIgnoreText('')
+    try {
+      const result = await svnApi.ignoreGet(scope)
+      setIgnoreText(result.rules.join('\n'))
+    } catch (reason) {
+      setIgnoreError(friendlySvnMessage(reason))
+    } finally {
+      setIgnoreLoading(false)
+    }
+  }
+
+  /** 保存忽略规则：清空 → propdel；非空 → propset；保存后刷新状态区，
+   *  被忽略的未版本控制文件即刻从面板消失。 */
+  const saveIgnore = async (): Promise<void> => {
+    setIgnoreSaving(true)
+    setIgnoreError(null)
+    try {
+      await svnApi.ignoreSet(scope, ignoreText.split(/\r?\n/))
+      setIgnoreOpen(false)
+      await refreshStatus()
+    } catch (reason) {
+      setIgnoreError(friendlySvnMessage(reason))
+    } finally {
+      setIgnoreSaving(false)
+    }
+  }
+
   /** 追加下一页历史（仅当用户要求更多时），并同步到模块级快照。 */
   const loadMoreLog = async (): Promise<void> => {
     if (logLoadingMore || logEnded) return
@@ -193,7 +235,7 @@ export function SvnView(props: SvnViewProps) {
       setLogEnded(ended)
       logSnapshots.set(logSnapshotKey(scope), { entries: merged, ended })
     } catch (reason) {
-      setActionError(`历史加载失败: ${reason instanceof Error ? reason.message : String(reason)}`)
+      setActionError(`历史加载失败: ${friendlySvnMessage(reason)}`)
     } finally {
       setLogLoadingMore(false)
     }
@@ -223,7 +265,7 @@ export function SvnView(props: SvnViewProps) {
       await action()
       await refresh()
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : String(reason))
+      setActionError(friendlySvnMessage(reason))
     } finally {
       setBusy(false)
     }
@@ -263,7 +305,7 @@ export function SvnView(props: SvnViewProps) {
       setCommitMsg('')
       await refresh()
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : String(reason))
+      setActionError(friendlySvnMessage(reason))
     } finally {
       setBusy(false)
     }
@@ -278,7 +320,7 @@ export function SvnView(props: SvnViewProps) {
         await confirmState.onConfirm()
         await refresh()
       } catch (reason) {
-        setActionError(reason instanceof Error ? reason.message : String(reason))
+        setActionError(friendlySvnMessage(reason))
       } finally {
         setBusy(false)
       }
@@ -359,6 +401,16 @@ export function SvnView(props: SvnViewProps) {
           <button
             type="button"
             className="svn-iconbtn"
+            aria-label="忽略规则"
+            title="当前目录忽略规则 (svn:ignore)"
+            disabled={busy || svnMissing || (status !== null && !status.isRepo)}
+            onClick={() => { void openIgnoreModal() }}
+          >
+            <IconListPenOutline16 size={14} />
+          </button>
+          <button
+            type="button"
+            className="svn-iconbtn"
             aria-label="更新"
             title="更新 (svn update)"
             disabled={busy || (status !== null && !status.isRepo)}
@@ -379,8 +431,14 @@ export function SvnView(props: SvnViewProps) {
       </div>
 
       {loading && <div className="svn-placeholder">加载中...</div>}
-      {!loading && error !== null && <div className="svn-error">{error}</div>}
-      {!loading && status !== null && !status.isRepo && (
+      {!loading && svnMissing && (
+        <div className="svn-placeholder svn-missing">
+          <div className="svn-missing-title">缺少 svn 命令行</div>
+          <div>系统未安装 svn 命令行，请安装后重试（macOS: brew install subversion；或重启使 PATH 生效）。</div>
+        </div>
+      )}
+      {!loading && !svnMissing && error !== null && <div className="svn-error">{error}</div>}
+      {!loading && !svnMissing && status !== null && !status.isRepo && (
         <div className="svn-placeholder">当前目录不是 SVN 工作副本</div>
       )}
 
@@ -628,6 +686,42 @@ export function SvnView(props: SvnViewProps) {
           </Modal>
         </>
       )}
+
+      {/* 忽略规则弹窗：读 / 编辑 / 保存当前目录 svn:ignore（不递归）。 */}
+      <Modal
+        open={ignoreOpen}
+        onClose={() => { if (!ignoreSaving) setIgnoreOpen(false) }}
+        title="当前目录忽略规则"
+        closeLabel="取消"
+        footer={(
+          <>
+            <Button variant="outline" disabled={ignoreSaving} onClick={() => { setIgnoreOpen(false) }}>取消</Button>
+            <Button
+              variant="primary"
+              disabled={ignoreSaving || ignoreLoading}
+              onClick={() => { void saveIgnore() }}
+            >
+              {ignoreSaving ? '保存中...' : '保存'}
+            </Button>
+          </>
+        )}
+      >
+        <p className="svn-ignore-hint">
+          每行一条忽略模式（如 <code>target</code>、<code>*.log</code>）。规则仅作用于当前目录、不递归；
+          清空所有规则并保存会删除 <code>svn:ignore</code> 属性。保存后自动刷新状态区。
+        </p>
+        {ignoreLoading && <div className="svn-placeholder">读取 svn:ignore...</div>}
+        {!ignoreLoading && (
+          <textarea
+            className="svn-ignore-textarea"
+            value={ignoreText}
+            placeholder="（当前目录没有 svn:ignore 属性）"
+            spellCheck={false}
+            onChange={(event) => { setIgnoreText(event.target.value); setIgnoreError(null) }}
+          />
+        )}
+        {ignoreError !== null && <div className="svn-error">{ignoreError}</div>}
+      </Modal>
     </div>
   )
 }

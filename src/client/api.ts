@@ -21,6 +21,15 @@ export class SvnApiError extends Error {
   }
 }
 
+/** 把后端错误码映射为前端可直接展示的友好文案。 */
+export function friendlySvnMessage(reason: unknown): string {
+  const message = reason instanceof Error ? reason.message : String(reason)
+  if (reason instanceof SvnApiError && reason.code === 'svn-missing') {
+    return '系统未安装 svn 命令行，请安装后重试'
+  }
+  return message
+}
+
 /** 通用 POST 调用。 */
 async function call<T>(method: string, payload: Record<string, unknown>): Promise<T> {
   let response: Response
@@ -123,4 +132,12 @@ export const svnApi = {
   /** 撤销某次提交（改动落回工作副本）。 */
   revertRevision: (scope: SessionScope, revision: string) =>
     call<{ ok: true }>('svn.revertRevision', scopePayload(scope, { revision })),
+
+  /** 读取当前目录的 svn:ignore 规则（按行拆分）。 */
+  ignoreGet: (scope: SessionScope) =>
+    call<{ rules: string[] }>('svn.ignoreGet', scopePayload(scope, {})),
+
+  /** 写入当前目录的 svn:ignore：空数组 = 删除 svn:ignore 属性。 */
+  ignoreSet: (scope: SessionScope, rules: string[]) =>
+    call<{ ok: true; rules: string[] }>('svn.ignoreSet', scopePayload(scope, { rules })),
 }

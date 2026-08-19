@@ -16,6 +16,7 @@ import type { Context, TabComponentProps } from 'dsh-better-sidebar'
 import type { SidebarTab } from 'dsh-better-sidebar/client/service'
 import { IconBranchOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement } from 'react'
+import { ErrorBoundary } from './ErrorBoundary.tsx'
 import { SvnDiffTab, type SvnDiffMeta } from './SvnDiffTab.tsx'
 import { SvnView } from './SvnView.tsx'
 import svnCss from './svn.css'
@@ -58,11 +59,11 @@ export function apply(ctx: Context): void {
       icon: (size: number) => createElement(IconBranchOutline16, { size }),
       order: 25, // 排在 git (20) 后面、subagent (30) 前面
       single: true, // 单实例
-      component: (props: TabComponentProps) => createElement(SvnView, {
+      component: (props: TabComponentProps) => createElement(ErrorBoundary, { label: 'SvnView', children: createElement(SvnView, {
         scope: props.scope,
         betterSidebar: ctx.betterSidebar,
         onOpenFile: props.onOpenFile ?? (() => { /* no-op */ }),
-      }),
+      }) }),
     })
 
     const disposeDiff = ctx.betterSidebar.registerTab({
@@ -72,10 +73,10 @@ export function apply(ctx: Context): void {
       icon: (size: number) => createElement(IconDiffOutline16, { size }),
       hidden: true,
       dedupeKey: (tab: SidebarTab) => tab.id,
-      component: (props: TabComponentProps) => createElement(SvnDiffTab, {
+      component: (props: TabComponentProps) => createElement(ErrorBoundary, { label: 'SvnDiffTab', children: createElement(SvnDiffTab, {
         scope: props.scope,
         meta: (props.tab.meta ?? {}) as SvnDiffMeta,
-      }),
+      }) }),
     })
 
     return () => { disposeDiff(); disposeMain() }

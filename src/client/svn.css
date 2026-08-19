@@ -446,3 +446,169 @@
   outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
   outline-offset: -1px;
 }
+
+/* ── svn:ignore 弹窗 ─────────────────────────────────────────────── */
+
+.svn-ignore-hint {
+  margin: 0 0 8px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  line-height: 1.6;
+}
+
+.svn-ignore-hint code {
+  font: var(--dsw-font-markdown-code-block-small);
+}
+
+.svn-ignore-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  padding: 8px 10px;
+  font: var(--dsw-font-markdown-code-block-small);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+}
+
+.svn-ignore-textarea:focus {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: -1px;
+}
+
+/* svn 缺失 / 渲染错误占位 */
+.svn-missing {
+  text-align: left;
+}
+
+.svn-missing-title {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-state-error-primary);
+  margin-bottom: 4px;
+}
+
+.svn-error-boundary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 16px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-error-boundary-title {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.svn-error-boundary-message {
+  color: var(--dsw-alias-label-secondary);
+  word-break: break-word;
+}
+
+/* ── diff 搜索 / 过滤工具条 ──────────────────────────────────────── */
+
+.svn-difftab-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 8px 0;
+}
+
+.svn-diff-input {
+  min-width: 0;
+  flex: 1;
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 8px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+}
+
+.svn-diff-input:focus {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: -1px;
+}
+
+.svn-diff-searchbox {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.svn-diff-searchbox .svn-diff-input {
+  padding-right: 6px;
+}
+
+.svn-diff-count {
+  flex: none;
+  font: var(--dsw-font-xxxs-strong-11);
+  color: var(--dsw-alias-label-tertiary);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.svn-diff-navbtn {
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.svn-diff-collapsebtn {
+  width: auto;
+  height: 26px;
+  padding: 0 8px;
+  font: var(--dsw-font-xxs-12);
+  border-radius: 6px;
+}
+
+.svn-diff-collapsebtn-active {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.svn-diff-mark {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.svn-diff-mark-active {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 60%, transparent);
+  color: var(--dsw-alias-label-primary-inverted);
+}
+
+.svn-diff-line-active {
+  outline: 1px solid var(--dsw-alias-brand-primary);
+  outline-offset: -1px;
+}
+
+.svn-diff-hunk-collapsed {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 4px 0;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  background: none;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.svn-diff-hunk-collapsed:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
