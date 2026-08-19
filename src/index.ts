@@ -15,6 +15,12 @@
  *  - svn.cat        → 获取某版本文件内容
  *  - svn.info       → 仓库信息
  *  - svn.resolve    → 解决冲突
+ *  - svn.revertRevision → 撤销某次提交
+ *  - svn.ignoreGet  → 读取当前目录 svn:ignore
+ *  - svn.ignoreSet  → 写入 / 清空当前目录 svn:ignore（写操作锁定 cwd realpath）
+ *
+ * 宿主启动后首个请求惰性探测 `svn` 二进制；缺失时所有方法统一返回
+ * `svn-missing` 错误码与可读提示。
  */
 import { isAbsolute } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -157,6 +163,21 @@ function buildApi(ctx: Context): Record<string, ApiMethod> {
       svn.invalidateLogCache(cwd)
       return { ok: true }
     },
+    'svn.ignoreGet': async (payload) => {
+      const { cwd } = cwdOf(ctx, payload)
+      const rules = await svn.ignoreGet(cwd)
+      return { rules }
+    },
+    'svn.ignoreSet': async (payload) => {
+      const { cwd } = cwdOf(ctx, payload)
+      const record = payload as { rules?: unknown }
+      if (record.rules !== undefined && (!Array.isArray(record.rules) || record.rules.some(rule => typeof rule !== 'string'))) {
+        throw new SidebarError('bad-request', '"rules" must be an array of strings')
+      }
+      const rules: string[] = Array.isArray(record.rules) ? record.rules : []
+      const saved = await svn.ignoreSet(cwd, rules)
+      return { ok: true, rules: saved }
+    },
   }
 }
 
@@ -183,6 +204,9 @@ export function apply(ctx: Context): void {
           return
         }
         try {
+          // 惰性探测（进程级缓存）：系统没有 svn 时所有操作统一 svn-missing，
+          // 避免用户看到无意义的 spawn ENOENT 报错。
+          await svn.ensureSvnAvailable()
           const payload = await readJsonBody(req)
           writeOk(res, await api[method](payload))
         } catch (error) {

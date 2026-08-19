@@ -77,11 +77,15 @@ export interface SvnLogPath {
 
 /** SVN 命令错误。 */
 export class SvnCommandError extends Error {
+  readonly code: string
+  readonly command: string
   constructor(
     message: string,
-    readonly code = 'svn-error',
-    readonly command: string,
+    code = 'svn-error',
+    command: string,
   ) {
     super(message)
+    this.code = code
+    this.command = command
   }
 }

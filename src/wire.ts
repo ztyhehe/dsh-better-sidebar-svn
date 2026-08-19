@@ -5,12 +5,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 export class SidebarError extends Error {
+  readonly code: string
+  readonly status: number
   constructor(
-    readonly code: string,
+    code: string,
     message: string,
-    readonly status = 400,
+    status = 400,
   ) {
     super(message)
+    this.code = code
+    this.status = status
   }
 }
 
@@ -57,11 +61,14 @@ export function writeError(res: ServerResponse, error: unknown): void {
   if (error instanceof SidebarError) {
     res.writeHead(error.status, { 'content-type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ ok: false, error: { code: error.code, message: error.message } }))
-  } else {
-    const message = error instanceof Error ? error.message : String(error)
-    res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ ok: false, error: { code: 'internal', message } }))
+    return
   }
+  const message = error instanceof Error ? error.message : String(error)
+  const code = typeof (error as { code?: unknown } | null)?.code === 'string' ? (error as { code: string }).code : 'internal'
+  // 环境 / 入参类错误用 4xx；其余错误保留 500 但透传真实错误码（如 svn-error）
+  const status = code === 'svn-missing' || code === 'bad-cwd' ? 400 : 500
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify({ ok: false, error: { code, message } }))
 }
 
 /** 写入 JSON 响应（自定义状态码）。 */

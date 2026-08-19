@@ -6,25 +6,31 @@
  * 与 git.ts 设计对称：每个操作独立 spawn 一个进程，无状态、无库依赖。
  */
 import { spawn } from 'node:child_process'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { SvnCommandError, STAGE_CHANGELIST, type SvnLogEntry, type SvnLogPath, type SvnStatusEntry, type SvnStatusResult } from './types.ts'
+
+/** `svn` 二进制缺失 / 无法运行时的统一错误码与可读文案。 */
+export const SVN_MISSING_MESSAGE = '系统未安装 svn 命令行，请安装后重试'
 
 // ── XML 解析辅助函数 ──────────────────────────────────────────────────────
 
 /** 用正则从 XML 中提取 `<entry>` 块的内容（轻量级，不依赖完整 XML 解析器）。 */
-function extractTag(content: string, tag: string): string | undefined {
+export function extractTag(content: string, tag: string): string | undefined {
   const re = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, 'i')
   const match = re.exec(content)
   return match?.[1] ?? undefined
 }
 
 /** 提取指定元素的开始标签上的属性值，如 `<commit revision="...">`。 */
-function extractAttr(content: string, element: string, attr: string): string | undefined {
+export function extractAttr(content: string, element: string, attr: string): string | undefined {
   const re = new RegExp(`<${element}\\b[^>]*\\b${attr}="([^"]*)"`, 'i')
   return re.exec(content)?.[1] ?? undefined
 }
 
 /** 从 XML 中提取所有 `<entry>` 块（含开始标签与整体位置，用于归属 changelist 容器）。 */
-function extractEntries(xml: string): { xml: string; start: number; end: number }[] {
+export function extractEntries(xml: string): { xml: string; start: number; end: number }[] {
   const entries: { xml: string; start: number; end: number }[] = []
   const re = /<entry\b[^>]*>[\s\S]*?<\/entry>/gi
   let match: RegExpExecArray | null
@@ -35,7 +41,7 @@ function extractEntries(xml: string): { xml: string; start: number; end: number 
 }
 
 /** 提取所有 `<changelist name="...">` 容器的名字与区间（成员 entry 落在其内即归属该列表）。 */
-function extractChangelistSpans(xml: string): { name: string; start: number; end: number }[] {
+export function extractChangelistSpans(xml: string): { name: string; start: number; end: number }[] {
   const spans: { name: string; start: number; end: number }[] = []
   const re = /<changelist\b[^>]*\bname="([^"]*)"[^>]*>[\s\S]*?<\/changelist>/gi
   let match: RegExpExecArray | null
@@ -46,7 +52,7 @@ function extractChangelistSpans(xml: string): { name: string; start: number; end
 }
 
 /** 从 XML 中提取所有 `<logentry>` 块（含开始标签，以读取 revision 属性）。 */
-function extractLogEntries(xml: string): string[] {
+export function extractLogEntries(xml: string): string[] {
   const entries: string[] = []
   const re = /<logentry\b[^>]*>[\s\S]*?<\/logentry>/gi
   let match: RegExpExecArray | null
@@ -57,7 +63,7 @@ function extractLogEntries(xml: string): string[] {
 }
 
 /** 从 `<path>` 元素中提取变更信息。 */
-function extractPaths(entryXml: string): SvnLogPath[] {
+export function extractPaths(entryXml: string): SvnLogPath[] {
   const paths: SvnLogPath[] = []
   const re = /<path\b[^>]*\baction="([^"]*)"[^>]*>([^<]*)<\/path>/gi
   let match: RegExpExecArray | null
@@ -68,17 +74,46 @@ function extractPaths(entryXml: string): SvnLogPath[] {
 }
 
 /** 在 `<info>` 中提取 `<entry>` 块（含开始标签，以读取 revision 属性）。 */
-function extractInfoEntry(xml: string): string | undefined {
+export function extractInfoEntry(xml: string): string | undefined {
   const re = /<entry\b[^>]*>[\s\S]*?<\/entry>/i
   return re.exec(xml)?.[0]
 }
 
+/** 解码 `svn --xml` 输出中最常见的实体。 */
+export function decodeXmlText(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+/** 从 `svn prop* --xml` 输出中提取指定 property 的文本值。 */
+export function extractPropertyValue(xml: string, propertyName: string): string | undefined {
+  const re = new RegExp(`<property\\b[^>]*\\bname="${escapeRegExp(propertyName)}"[^>]*>([\\s\\S]*?)<\\/property>`, 'i')
+  return re.exec(xml)?.[1]
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // ── 命令执行 ──────────────────────────────────────────────────────────────
 
-/** 运行一个 svn 命令，返回 stdout。 */
-function runSvn(cwd: string, args: string[], timeoutMs = 30_000): Promise<string> {
+/** `runSvnRaw` 的原始结果。 */
+interface RawSvnResult {
+  stdout: string
+  stderr: string
+  code: number | null
+  spawnError?: Error
+  timedOut: boolean
+}
+
+/** 运行一个 svn 命令但不在非零退出时抛错（propget 等需要区分 warning 的场景用）。 */
+function runSvnRaw(cwd: string, args: string[], timeoutMs = 30_000): Promise<RawSvnResult> {
   const full = ['--non-interactive', '--no-auth-cache', ...args]
-  return new Promise<string>((resolvePromise, reject) => {
+  return new Promise<RawSvnResult>((resolvePromise) => {
     const child = spawn('svn', full, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -86,25 +121,93 @@ function runSvn(cwd: string, args: string[], timeoutMs = 30_000): Promise<string
     })
     let stdout = ''
     let stderr = ''
+    let settled = false
     const timer = setTimeout(() => {
       child.kill('SIGKILL')
-      reject(new SvnCommandError(`svn ${args[0] ?? ''} timed out after ${timeoutMs}ms`, 'svn-error', args.join(' ')))
+      settle({ stdout, stderr, code: null, timedOut: true })
     }, timeoutMs)
+    const settle = (result: RawSvnResult): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolvePromise(result)
+    }
     child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
     child.on('error', (error) => {
-      clearTimeout(timer)
-      reject(new SvnCommandError(`cannot run svn: ${error.message}`, 'svn-error', args.join(' ')))
+      settle({ stdout, stderr, code: null, spawnError: error, timedOut: false })
     })
     child.on('close', (code) => {
-      clearTimeout(timer)
+      settle({ stdout, stderr, code, timedOut: false })
+    })
+  })
+}
+
+function spawnErrorDescription(error: Error): string {
+  const code = (error as NodeJS.ErrnoException).code
+  if (code === 'ENOENT') {
+    return SVN_MISSING_MESSAGE
+  }
+  return `cannot run svn: ${error.message}`
+}
+
+/** 运行一个 svn 命令，返回 stdout；非零退出抛 `SvnCommandError`。 */
+async function runSvn(cwd: string, args: string[], timeoutMs = 30_000): Promise<string> {
+  const full = ['--non-interactive', '--no-auth-cache', ...args]
+  const result = await runSvnRaw(cwd, args, timeoutMs)
+  if (result.timedOut) {
+    throw new SvnCommandError(`svn ${args[0] ?? ''} timed out after ${timeoutMs}ms`, 'svn-error', full.join(' '))
+  }
+  if (result.spawnError !== undefined) {
+    const description = spawnErrorDescription(result.spawnError)
+    const code = ((result.spawnError as NodeJS.ErrnoException).code === 'ENOENT') ? 'svn-missing' : 'svn-error'
+    throw new SvnCommandError(description, code, full.join(' '))
+  }
+  if (result.code !== 0) {
+    throw new SvnCommandError(result.stderr.trim() || `svn exited with ${String(result.code)}`, 'svn-error', full.join(' '))
+  }
+  return result.stdout
+}
+
+/** 惰性探测 `svn` 二进制：host 首个 API 请求时调用，结果缓存。 */
+let svnAvailability: Promise<true> | undefined
+
+export function ensureSvnAvailable(): Promise<true> {
+  svnAvailability ??= new Promise<true>((resolvePromise, reject) => {
+    const child = spawn('svn', ['--version', '--quiet'], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: { ...process.env },
+    })
+    let stderr = ''
+    let settled = false
+    const fail = (): void => {
+      if (settled) return
+      settled = true
+      reject(new SvnCommandError(SVN_MISSING_MESSAGE, 'svn-missing', 'svn --version'))
+    }
+    child.stderr.on('data', (chunk: Buffer) => { stderr = chunk.toString('utf8').trim() })
+    child.on('error', fail)
+    child.on('close', (code) => {
       if (code === 0) {
-        resolvePromise(stdout)
+        settled = true
+        resolvePromise(true)
       } else {
-        reject(new SvnCommandError(stderr.trim() || `svn exited with ${String(code)}`, 'svn-error', args.join(' ')))
+        void stderr
+        fail()
       }
     })
   })
+  return svnAvailability
+}
+
+/** 写操作目标锁定：把 cwd 解析为 realpath，避免相对路径/软链把 svn:ignore 写到工作副本外。 */
+export async function lockCwd(cwd: string): Promise<string> {
+  try {
+    return await realpath(cwd)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new SvnCommandError(`无法解析工作目录 "${cwd}"：${message}`, 'bad-cwd', 'realpath')
+  }
 }
 
 // ── 核心操作 ──────────────────────────────────────────────────────────────
@@ -277,7 +380,7 @@ export function invalidateLogCache(cwd: string): void {
 }
 
 /** 解析 `svn log --xml` 输出。 */
-function parseLog(xml: string): SvnLogEntry[] {
+export function parseLog(xml: string): SvnLogEntry[] {
   return extractLogEntries(xml).map((entryXml) => ({
     // <logentry revision="..."> 中版本号是属性而非元素
     revision: extractAttr(entryXml, 'logentry', 'revision') ?? '0',
@@ -305,4 +408,71 @@ export async function resolve(cwd: string, path: string, accept: 'base' | 'worki
 /** 撤销某次提交（`svn merge -c -REV`，等价 `git revert`），改动落回工作副本待提交。 */
 export async function revertRevision(cwd: string, revision: string): Promise<void> {
   await runSvn(cwd, ['merge', '-c', `-${revision}`, '.'])
+}
+
+// ── svn:ignore 管理 ───────────────────────────────────────────────────────
+
+/**
+ * `svn propget --xml` 在属性不存在时退出码为 1、stderr 带 W200017 warning，
+ * 属于正常业务情况；按空规则列表返回，其它非零退出照常抛错。
+ */
+function normalizeIgnoreText(text: string): string[] {
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line !== '')
+}
+
+/** 读取当前工作副本目录的 `svn:ignore`（不递归、不包含继承属性）。 */
+export async function ignoreGet(cwd: string): Promise<string[]> {
+  const target = await lockCwd(cwd)
+  const result = await runSvnRaw(target, ['propget', '--xml', 'svn:ignore', '.'], 15_000)
+  if (result.timedOut) {
+    throw new SvnCommandError(`svn propget timed out after 15000ms`, 'svn-error', 'propget --xml svn:ignore .')
+  }
+  if (result.spawnError !== undefined) {
+    const description = spawnErrorDescription(result.spawnError)
+    const code = ((result.spawnError as NodeJS.ErrnoException).code === 'ENOENT') ? 'svn-missing' : 'svn-error'
+    throw new SvnCommandError(description, code, 'propget --xml svn:ignore .')
+  }
+  const raw = extractPropertyValue(result.stdout, 'svn:ignore')
+  if (raw !== undefined) {
+    return normalizeIgnoreText(decodeXmlText(raw))
+  }
+  // 属性不存在：svn 1.x 以 W200017 warning + exit 1 表示
+  if (/\bW200017\b|\bE200017\b/.test(result.stderr)) return []
+  if (result.code !== 0) {
+    const message = result.stderr.trim() || `svn propget exited with ${String(result.code)}`
+    throw new SvnCommandError(message, 'svn-error', 'propget --xml svn:ignore .')
+  }
+  return []
+}
+
+/** 写入当前工作副本目录的 `svn:ignore`：
+ *  - 非空规则经临时文件 `propset svn:ignore -F <tmp> .`（避免转义 / 命令行长度问题）；
+ *  - 清空规则走 `propdel`（`propset` 空串不等价于删除属性，属性必须真正删除）。
+ *  目标 cwd 先 realpath 锁定，避免相对路径 / 软链写到工作副本外。
+ */
+export async function ignoreSet(cwd: string, rules: readonly string[]): Promise<string[]> {
+  const normalized = rules
+    .filter((rule): rule is string => typeof rule === 'string')
+    .map(rule => rule.trim())
+    .filter(rule => rule !== '')
+  const target = await lockCwd(cwd)
+
+  if (normalized.length === 0) {
+    await runSvn(target, ['propdel', 'svn:ignore', '.'])
+    return normalized
+  }
+
+  const tempDir = await mkdtemp(join(tmpdir(), 'dsh-better-sidebar-svn-ignore-'))
+  const tempFile = join(tempDir, 'svn-ignore')
+  try {
+    await writeFile(tempFile, `${normalized.join('\n')}\n`, 'utf8')
+    await runSvn(target, ['propset', 'svn:ignore', '-F', tempFile, '.'])
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => { /* 清理失败不影响结果 */ })
+  }
+  return normalized
 }
