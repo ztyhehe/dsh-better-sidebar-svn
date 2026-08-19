@@ -5,13 +5,15 @@
 ## ✨ 功能
 
 - **📊 状态面板**：变更分「已暂存 / 未暂存」两段显示（修改/添加/删除/冲突/未版本控制等）
-- **🔍 文件 Diff**：点击文件查看差异对比
+- **🔍 文件 Diff**：点击文件查看差异对比；diff 标题栏支持**关键词搜索**（命中行高亮、`n/m` 计数、Enter / Shift+Enter 上下跳转、可选折叠无命中 hunk）与**路径过滤**（按文件路径子串过滤，纯前端、不新增网络请求）
 - **✅ 暂存式提交**：与内置 Git 面板逻辑一致——行尾 `+`/`−` 按钮把文件加入/移出「待提交」列表（SVN changelist `dsh-commit`，纯本地元数据），提交**只提交已暂存的文件**；支持全部暂存/全部取消、Ctrl+Enter 提交；未版本控制文件暂存时自动先 `svn add`
 - **🔄 更新**：一键 `svn update` 同步远端
 - **↩️ 还原**：还原单个文件修改
 - **➕ 添加**：将未版本控制文件添加到版本控制
+- **🙈 忽略规则**：标题栏「忽略规则」弹窗读写当前目录 `svn:ignore`（换行分隔模式），非空规则经临时文件 `propset -F` 写入、清空走 `propdel`；规则仅作用于当前目录、不递归，保存后自动刷新状态区
 - **📜 历史**：查看提交历史（分页加载），含变更文件列表
 - **🔧 冲突解决**：对冲突文件提供快速解决按钮
+- **🛡️ 降级与容错**：系统缺失 `svn` 时面板显示友好提示（`svn-missing`）而非空白报错；`SvnView` / `SvnDiffTab` 均有 React ErrorBoundary，渲染异常显示可读占位而非整面板白屏
 
 ## 📦 安装
 
@@ -45,9 +47,13 @@ dsh-better-sidebar-svn/
 │   ├── types.ts              # 共享类型定义
 │   └── client/
 │       ├── index.tsx          # Client 半：注册 SVN Tab 到 better-sidebar
-│       ├── SvnView.tsx        # SVN 面板 React 组件
+│       ├── SvnView.tsx        # SVN 面板 React 组件（v0.2.0 增 ignore 弹窗）
+│       ├── SvnDiffTab.tsx     # diff 标签页（v0.2.0 增搜索 / 过滤）
+│       ├── ErrorBoundary.tsx  # 渲染错误边界
+│       ├── diff.ts            # 统一 diff 解析纯函数（可测）
 │       ├── api.ts             # 类型化 API 封装
 │       └── svn.css            # 面板样式
+├── tests/                     # Node 内置 test runner 单测
 ├── package.json
 └── tsconfig.json
 ```
@@ -81,12 +87,19 @@ dsh-better-sidebar-svn/
 | `svn.cat` | 获取某版本文件内容 |
 | `svn.info` | 仓库信息 |
 | `svn.resolve` | 解决冲突 |
+| `svn.revertRevision` | 撤销某次提交（`svn merge -c -REV`） |
+| `svn.ignoreGet` | 读取当前目录 `svn:ignore`（按行拆分） |
+| `svn.ignoreSet` | 写入 / 清空当前目录 `svn:ignore`（非空 `propset -F` 临时文件，空规则 `propdel`；写操作锁定 cwd realpath） |
+
+> 所有路由均走 trust-fence 与统一 JSON 响应（`{ ok, value }` / `{ ok:false, error:{code,message} }`）约定；
+> 系统无 `svn` 时统一返回 `svn-missing` 错误码。
 
 ## 🛠️ 开发
 
 ```bash
 pnpm install
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
