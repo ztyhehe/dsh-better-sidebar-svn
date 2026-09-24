@@ -9,8 +9,8 @@
  */
 import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
-  Button, IconBranchOutline16, IconCheckOutline16, IconCodeOutline16, IconCopyOutline16,
-  IconDownloadOutline16, IconListPenOutline16, IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16,
+  Button, IconBranchOutlineRegular, IconCheckOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular,
+  IconDownloadOutlineRegular, IconListPenOutlineRegular, IconPlusOutlineRegular, IconRefreshOutlineRegular, IconTrashOutlineRegular,
   Input, Menu, Modal, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BetterSidebarService } from 'dsh-better-sidebar'
@@ -406,7 +406,7 @@ export function SvnView(props: SvnViewProps) {
             disabled={busy || svnMissing || (status !== null && !status.isRepo)}
             onClick={() => { void openIgnoreModal() }}
           >
-            <IconListPenOutline16 size={14} />
+            <IconListPenOutlineRegular size={14} />
           </button>
           <button
             type="button"
@@ -416,7 +416,7 @@ export function SvnView(props: SvnViewProps) {
             disabled={busy || (status !== null && !status.isRepo)}
             onClick={() => { void runAction(() => svnApi.update(scope)) }}
           >
-            <IconDownloadOutline16 size={14} />
+            <IconDownloadOutlineRegular size={14} />
           </button>
           <button
             type="button"
@@ -425,7 +425,7 @@ export function SvnView(props: SvnViewProps) {
             title="刷新"
             onClick={() => { void refresh(true) }}
           >
-            <IconRefreshOutline16 size={14} />
+            <IconRefreshOutlineRegular size={14} />
           </button>
         </span>
       </div>
@@ -541,31 +541,31 @@ export function SvnView(props: SvnViewProps) {
             open={fileMenu !== null}
             onClose={() => { setFileMenu(null) }}
             items={[
-              { id: 'open', label: '在编辑器中打开', icon: <IconCodeOutline16 size={14} /> },
+              { id: 'open', label: '在编辑器中打开', icon: <IconCodeOutlineRegular size={14} /> },
               { id: 'diff', label: '查看变更' },
               ...(fileMenu !== null && fileMenu.staged
-                ? [{ id: 'unstage', label: '取消暂存', icon: <IconTrashOutline16 size={14} /> }]
+                ? [{ id: 'unstage', label: '取消暂存', icon: <IconTrashOutlineRegular size={14} /> }]
                 : []),
               ...(fileMenu !== null && !fileMenu.staged
                 && fileMenu.entry.status !== 'conflicted' && fileMenu.entry.status !== 'missing'
                 ? [{
                     id: 'stage',
                     label: fileMenu.entry.status === 'unversioned' ? '添加并暂存' : '暂存',
-                    icon: <IconBranchOutline16 size={14} />,
+                    icon: <IconBranchOutlineRegular size={14} />,
                   }]
                 : []),
               ...(fileMenu !== null && fileMenu.entry.status === 'unversioned'
-                ? [{ id: 'add', label: '仅添加到版本控制', icon: <IconPlusOutline16 size={14} /> }]
+                ? [{ id: 'add', label: '仅添加到版本控制', icon: <IconPlusOutlineRegular size={14} /> }]
                 : []),
               ...(fileMenu !== null && fileMenu.entry.status === 'conflicted'
-                ? [{ id: 'resolve', label: '解决冲突（保留当前）', icon: <IconCheckOutline16 size={14} /> }]
+                ? [{ id: 'resolve', label: '解决冲突（保留当前）', icon: <IconCheckOutlineRegular size={14} /> }]
                 : []),
               ...(fileMenu !== null && isVersionedChange(fileMenu.entry)
-                ? [{ id: 'revert', label: '还原', icon: <IconTrashOutline16 size={14} />, danger: true }]
+                ? [{ id: 'revert', label: '还原', icon: <IconTrashOutlineRegular size={14} />, danger: true }]
                 : []),
               { type: 'separator', id: 'sep1' },
-              { id: 'relative', label: '复制相对路径', icon: <IconCopyOutline16 size={14} /> },
-              { id: 'absolute', label: '复制绝对路径', icon: <IconCopyOutline16 size={14} /> },
+              { id: 'relative', label: '复制相对路径', icon: <IconCopyOutlineRegular size={14} /> },
+              { id: 'absolute', label: '复制绝对路径', icon: <IconCopyOutlineRegular size={14} /> },
             ]}
             onSelect={(id) => {
               const target = fileMenu
@@ -622,8 +622,8 @@ export function SvnView(props: SvnViewProps) {
             onClose={() => { setHistoryMenu(null) }}
             items={[
               { id: 'view', label: '查看提交变更' },
-              { id: 'copyRev', label: '复制版本号', icon: <IconCopyOutline16 size={14} /> },
-              { id: 'copyMsg', label: '复制提交信息', icon: <IconCopyOutline16 size={14} /> },
+              { id: 'copyRev', label: '复制版本号', icon: <IconCopyOutlineRegular size={14} /> },
+              { id: 'copyMsg', label: '复制提交信息', icon: <IconCopyOutlineRegular size={14} /> },
               { type: 'separator', id: 'sep2' },
               { id: 'rollback', label: '还原此提交', danger: true },
             ]}
@@ -743,9 +743,9 @@ function inlineLabel(entry: SvnStatusEntry, staged: boolean): string {
 
 /** 行内 hover 按钮的图标（GitView：暂存用分支形、取消暂存用垃圾桶）。 */
 function inlineIcon(entry: SvnStatusEntry, staged: boolean): ReactNode {
-  if (staged) return <IconTrashOutline16 />
-  if (entry.status === 'unversioned') return <IconPlusOutline16 />
-  if (entry.status === 'conflicted') return <IconCheckOutline16 />
-  if (entry.status === 'missing') return <IconCodeOutline16 />
-  return <IconBranchOutline16 />
+  if (staged) return <IconTrashOutlineRegular />
+  if (entry.status === 'unversioned') return <IconPlusOutlineRegular />
+  if (entry.status === 'conflicted') return <IconCheckOutlineRegular />
+  if (entry.status === 'missing') return <IconCodeOutlineRegular />
+  return <IconBranchOutlineRegular />
 }

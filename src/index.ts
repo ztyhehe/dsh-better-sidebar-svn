@@ -23,7 +23,6 @@
  * `svn-missing` 错误码与可读提示。
  */
 import { isAbsolute } from 'node:path'
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from 'dsh-better-sidebar'
 import * as svn from './svn.ts'
 import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk, createTrustFence } from './wire.ts'
@@ -194,7 +193,10 @@ export function apply(ctx: Context): void {
     ctx.effect(() => ctx.webServer.register({
       kind: 'exact',
       path: `/sidebar/api/${method}`,
-      handler: async (req: IncomingMessage, res: ServerResponse) => {
+      // 参数类型交给上下文推断：0.1.7 起 register 声明的是 better-sidebar 自己的
+      // SidebarHttpRequest / SidebarHttpResponse（node req/res 的结构子集），
+      // 运行时传进来的就是真正的 node 对象，wire.ts 按同一结构面接收。
+      handler: async (req, res) => {
         if (!fence(req)) {
           writeJson(res, 403, { ok: false, error: { code: 'forbidden', message: 'forbidden' } })
           return

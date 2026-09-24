@@ -1,8 +1,27 @@
 /**
  * HTTP 路由辅助函数：与 dsh-better-sidebar 的 wire.ts 保持一致的 JSON 响应格式。
  * 所有响应统一为 `{ ok: true, value: ... }` 或 `{ ok: false, error: { code, message } }`。
+ *
+ * 入参用结构性类型而不是 node:http 的具体类型：0.1.7 起 `ctx.webServer.register`
+ * 声明的是 better-sidebar 自己的 `SidebarHttpRequest` / `SidebarHttpResponse`
+ * （node `IncomingMessage` / `ServerResponse` 的结构子集，刻意不让 Node 全局类型
+ * 漏进声明图）。这里声明等价的请求/响应最小面，运行时传进来的仍是真正的 node req/res，
+ * 既不用取私有子路径的类型，也不用强制类型断言。
  */
-import type { IncomingMessage, ServerResponse } from 'node:http'
+
+/** 请求面：url / method / headers / 异步可迭代的 body。 */
+export interface SidebarRequestLike {
+  url?: string
+  method?: string
+  headers: Record<string, string | string[] | undefined>
+  [Symbol.asyncIterator](): AsyncIterator<string | Uint8Array>
+}
+
+/** 响应面：路由实际用到的状态码、响应头与响应体写入。 */
+export interface SidebarResponseLike {
+  writeHead(status: number, headers?: Record<string, string>): void
+  end(body?: string | Uint8Array): void
+}
 
 export class SidebarError extends Error {
   readonly code: string
@@ -19,22 +38,20 @@ export class SidebarError extends Error {
 }
 
 /** 从请求体中读取 JSON。 */
-export function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => { chunks.push(chunk) })
-    req.on('end', () => {
-      try {
-        const body = Buffer.concat(chunks).toString('utf8')
-        resolve(body === '' ? {} : JSON.parse(body))
-      } catch (error) {
-        reject(new SidebarError('bad-request', 'invalid JSON body'))
-      }
-    })
-    req.on('error', (error) => {
-      reject(new SidebarError('bad-request', error.message))
-    })
-  })
+export async function readJsonBody(req: SidebarRequestLike): Promise<unknown> {
+  const chunks: Buffer[] = []
+  try {
+    for await (const chunk of req) chunks.push(Buffer.from(chunk))
+  } catch (error) {
+    throw new SidebarError('bad-request', error instanceof Error ? error.message : String(error))
+  }
+  const body = Buffer.concat(chunks).toString('utf8')
+  if (body === '') return {}
+  try {
+    return JSON.parse(body)
+  } catch {
+    throw new SidebarError('bad-request', 'invalid JSON body')
+  }
 }
 
 /** 从 payload 中提取字符串字段。 */
@@ -51,13 +68,13 @@ export function requireString(payload: unknown, field: string): string {
 }
 
 /** 写入成功响应。 */
-export function writeOk(res: ServerResponse, value: unknown): void {
+export function writeOk(res: SidebarResponseLike, value: unknown): void {
   res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
   res.end(JSON.stringify({ ok: true, value }))
 }
 
 /** 写入错误响应。 */
-export function writeError(res: ServerResponse, error: unknown): void {
+export function writeError(res: SidebarResponseLike, error: unknown): void {
   if (error instanceof SidebarError) {
     res.writeHead(error.status, { 'content-type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ ok: false, error: { code: error.code, message: error.message } }))
@@ -72,13 +89,13 @@ export function writeError(res: ServerResponse, error: unknown): void {
 }
 
 /** 写入 JSON 响应（自定义状态码）。 */
-export function writeJson(res: ServerResponse, status: number, body: unknown): void {
+export function writeJson(res: SidebarResponseLike, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
   res.end(JSON.stringify(body))
 }
 
 /** 读取请求头（小写键）。 */
-function header(headers: IncomingMessage['headers'], name: string): string | undefined {
+function header(headers: SidebarRequestLike['headers'], name: string): string | undefined {
   const value = headers[name]
   return typeof value === 'string' ? value : undefined
 }
@@ -120,7 +137,7 @@ function isTrustedAuthority(hostUrl: URL, trustedHosts: readonly string[]): bool
  * 构建浏览器信任围栏（与 dsh-better-sidebar 的 trust-fence 保持一致）：
  * Host 必须是本机回环或可信地址，且浏览器标记为同源。
  */
-export function createTrustFence(trustedHosts: readonly string[]): (req: IncomingMessage) => boolean {
+export function createTrustFence(trustedHosts: readonly string[]): (req: SidebarRequestLike) => boolean {
   return (req) => {
     const host = header(req.headers, 'host')
     if (host === undefined) return false

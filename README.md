@@ -5,7 +5,7 @@
 ## ✨ 功能
 
 - **📊 状态面板**：变更分「已暂存 / 未暂存」两段显示（修改/添加/删除/冲突/未版本控制等）
-- **🔍 文件 Diff**：点击文件查看差异对比；diff 标题栏支持**关键词搜索**（命中行高亮、`n/m` 计数、Enter / Shift+Enter 上下跳转、可选折叠无命中 hunk）与**路径过滤**（按文件路径子串过滤，纯前端、不新增网络请求）
+- **🔍 文件 Diff**：点击文件查看差异对比；diff 页签与内置 `diff` 页签对齐（标题「文件变动」、同款 changes 图标），标题栏支持**关键词搜索**（命中行高亮、`n/m` 计数、Enter / Shift+Enter 上下跳转、可选折叠无命中 hunk）与**路径过滤**（按文件路径子串过滤，纯前端、不新增网络请求）
 - **✅ 暂存式提交**：与内置 Git 面板逻辑一致——行尾 `+`/`−` 按钮把文件加入/移出「待提交」列表（SVN changelist `dsh-commit`，纯本地元数据），提交**只提交已暂存的文件**；支持全部暂存/全部取消、Ctrl+Enter 提交；未版本控制文件暂存时自动先 `svn add`
 - **🔄 更新**：一键 `svn update` 同步远端
 - **↩️ 还原**：还原单个文件修改
@@ -17,7 +17,7 @@
 
 ## 📦 安装
 
-前置：已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.12.0，本插件的必需 peer）。
+前置：已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.21.1，对应 DSH ≥ 0.1.7-rc.1；本插件的必需 peer）。
 
 ```bash
 cd ~/.dsh && dsh plugin --profile web add dsh-better-sidebar && dsh plugin --profile web add git+https://github.com/ztyhehe/dsh-better-sidebar-svn.git
@@ -33,7 +33,7 @@ cd ~/.dsh && dsh plugin --profile web remove dsh-better-sidebar-svn
 
 ## ⚙️ 前置条件
 
-- 已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (≥ 0.12.0)
+- 已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (≥ 0.21.1，DSH ≥ 0.1.7-rc.1)
 - 系统已安装 `svn` 命令行工具（1.7+）
 
 ## 🏗️ 架构

@@ -10,7 +10,7 @@
  * 不新增任何后端请求（diff 文本已经整体加载）。
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { IconRefreshOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconRefreshOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { findMatchRanges, parseUnifiedDiff, pathMatchesFilter, type DiffFile, type DiffLine } from './diff.ts'
 import type { SessionScope } from './api.ts'
 import { svnApi } from './api.ts'
@@ -200,7 +200,7 @@ export function SvnDiffTab(props: { scope: SessionScope; meta: SvnDiffMeta }) {
           title="刷新"
           onClick={refresh}
         >
-          <IconRefreshOutline16 size={14} />
+          <IconRefreshOutlineRegular size={14} />
         </button>
       </div>
       {!loading && error === null && diff !== null && diff !== '' && (

@@ -2,7 +2,7 @@
  * dsh-better-sidebar-svn client 半：向 better-sidebar 服务注册两个 Tab--
  * 1. 「源代码管理SVN」主面板（+ 菜单可见，order 25 排在 git 后面）；
  * 2. 隐藏的 diff 标签页类型（点击变更行 / 历史行时打开，不在 + 菜单出现，
- *    标题与主面板同名、diff 图标，对齐内置 Git 的 diff 标签页惯例）。
+ *    标题与图标对齐内置 `diff` 标签页：同叫「文件变动」、同用 changes 字形）。
  *
  * 使用方式（其他插件 / 手动挂载）：
  *   import type {} from 'dsh-better-sidebar-svn/client'

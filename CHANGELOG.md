@@ -2,8 +2,22 @@
 
 本文件按版本记录用户可见的变更，按「新增 / 修改 / 修复」分组整理（非 git log 转储）。
 
-## [Unreleased]
-（为下一版本预留）
+## [0.3.0] - 2026-09-24
+
+> 目标：适配 DSH 0.1.7-rc.1 / dsh-better-sidebar 0.21.1 支持线，并让 diff 页签与内置对齐。
+>
+> ⚠️ **支持线变更**：本版起要求 DSH ≥ `0.1.7-rc.1`、dsh-better-sidebar ≥ `0.21.1`。
+> 仍在使用 DSH `0.1.6-alpha.2` 及更早的用户请**留在 0.2.0**，不要升级本版。
+
+### 修复
+
+- **DSH 0.1.7-rc.1 图标导出改名**：`@deepseek-ai/dsh-client-ui-primitives` 把图标具名导出从 `...16` 整族改为 `...OutlineRegular` / `...OutlineMedium`，插件 client 半引用的 9 个旧名全部变成 `undefined`，渲染 SVN 面板与「+」菜单时抛 `Element type is invalid`。9 个名字（共 20 处）已迁到 `...OutlineRegular`。
+- **host 半路由 handler 类型**：0.1.7 起 `ctx.webServer.register` 声明的是 better-sidebar 自己的 `SidebarHttpRequest` / `SidebarHttpResponse`（node `IncomingMessage` / `ServerResponse` 的结构子集）。`src/wire.ts` 改为按同一结构面接收（并去掉 `node:http` 类型依赖），`readJsonBody` 改用异步迭代读体，`src/index.ts` 的 handler 参数交给上下文推断；运行时行为不变。
+
+### 修改
+
+- **diff 页签对齐内置**：`dsh-better-sidebar-svn:diff` 的标题由「源代码管理SVN」改为「文件变动」，图标由自定义 diff 图形改为内置 git / diff 两条共用的 changes 字形（内联 `VscGitCommit`，MIT，`fill: currentColor`）。主面板 `svn` 保持「源代码管理SVN」不变。
+- **依赖声明收敛**：`peerDependencies` 抬到 `^0.1.7-rc.1`、`dsh-better-sidebar` 抬到 `^0.21.1`，移除 0.1.7 线已不存在的 `@deepseek-ai/dsh-client-runtime` 与 `@deepseek-ai/dsh-client-web-react`；`dsh.client.inject` 同步移除前者。
 
 ## [0.2.0] - 2026-08-19
 
