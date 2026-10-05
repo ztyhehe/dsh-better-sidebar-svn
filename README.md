@@ -17,7 +17,7 @@
 
 ## 📦 安装
 
-前置：已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.21.1，对应 DSH ≥ 0.1.7-rc.1；本插件的必需 peer）。
+前置：已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥ 0.21.1，对应 DSH `0.1.7-rc.1` ~ `0.2.x`；本插件的必需 peer）。
 
 ```bash
 cd ~/.dsh && dsh plugin --profile web add dsh-better-sidebar && dsh plugin --profile web add git+https://github.com/ztyhehe/dsh-better-sidebar-svn.git
@@ -33,7 +33,7 @@ cd ~/.dsh && dsh plugin --profile web remove dsh-better-sidebar-svn
 
 ## ⚙️ 前置条件
 
-- 已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (≥ 0.21.1，DSH ≥ 0.1.7-rc.1)
+- 已安装 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (≥ 0.21.1，DSH `0.1.7-rc.1` ~ `0.2.x`)
 - 系统已安装 `svn` 命令行工具（1.7+）
 
 ## 🏗️ 架构

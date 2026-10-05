@@ -2,6 +2,27 @@
 
 本文件按版本记录用户可见的变更，按「新增 / 修改 / 修复」分组整理（非 git log 转储）。
 
+## [0.3.1] - 2026-10-05
+
+> 目标：修复「版本声明与运行时版本冲突」——插件在 DSH `0.2.x` 运行时被 profile 兼容性闸门拦下、静默跳过加载。
+>
+> ✅ **支持线**：DSH `^0.1.7-rc.1 || ^0.2.0-rc.1`（即 `0.1.7-rc.1` ~ `0.2.x`，`< 0.3.0`）+ dsh-better-sidebar ≥ `0.21.1`。
+> 未验证的 `0.3.x` 运行时仍会被拒（不提前放行）。
+
+### 修复
+
+- **DSH 0.2.x 被误拦**：四个 `@deepseek-ai/dsh-*` 的 `peerDependencies` 原先写作 `^0.1.7-rc.1`，按 caret 语义上界是 `0.2.0`（不含），因此在 DSH `0.2.0-rc.2` 下被判定为 `incompatible`：
+  ```
+  dsh: skipping profile bundle "dsh-better-sidebar-svn":
+  Plugin dsh-better-sidebar-svn@0.3.0 is incompatible with dsh 0.2.0-rc.2
+  ```
+  改为并集区间 `^0.1.7-rc.1 || ^0.2.0-rc.1`：解除 0.2.x 误拦，同时保留已在支持的 0.1.7 线。
+- **0.2.x 实测结论（本版结论依据）**：在真实 DSH `0.2.0-rc.2` 包集（`dsh-client-ui-primitives` / `dsh-host-webserver` / `dsh-session` / `dsh-settings` 均为 `0.2.0-rc.2`）与 `dsh-better-sidebar@0.24.1` 下，`tsc --noEmit` 0 error、build/bundle exit 0、单测 14/14 通过，且**构建产物 `lib/` 与 0.1.7-rc.1 线下逐字节一致**——无代码改动，纯声明修复。
+
+### 修改
+
+- 文档支持线表述同步为 `0.1.7-rc.1` ~ `0.2.x`（`< 0.3.0`），消除「文档声称的支持线」与「peer 区间」之间的冲突。
+
 ## [0.3.0] - 2026-09-24
 
 > 目标：适配 DSH 0.1.7-rc.1 / dsh-better-sidebar 0.21.1 支持线，并让 diff 页签与内置对齐。

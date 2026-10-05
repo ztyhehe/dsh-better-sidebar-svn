@@ -4,7 +4,7 @@
 
 ## 仓库简介
 
-`dsh-better-sidebar-svn` 是为 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥0.21.1，对应 DSH ≥0.1.7-rc.1）提供 **SVN（Subversion）源代码管理面板**的插件。host + client 双半结构：
+`dsh-better-sidebar-svn` 是为 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（≥0.21.1，对应 DSH `0.1.7-rc.1` ~ `0.2.x`）提供 **SVN（Subversion）源代码管理面板**的插件。host + client 双半结构：
 
 - **host 半** `src/index.ts`：注册 `/sidebar/api/svn.*` 精确路由，全部通过系统 `svn` 二进制（`--xml` 输出）驱动。
 - **client 半** `src/client/`：注册「源代码管理SVN」Tab 与 diff 标签页（`SvnView.tsx` / `SvnDiffTab.tsx`）。
@@ -56,3 +56,4 @@ docs/auto/2026-08-19-SVN面板功能补全-plan.md
 |------|---------------|------|------|
 | 2026-08-19 | SVN面板功能补全 | `docs/auto/2026-08-19-SVN面板功能补全-spec.md` | `docs/auto/2026-08-19-SVN面板功能补全-plan.md` |
 | 2026-09-24 | 适配DSH0.1.7图标改名与diff页签对齐 | `docs/auto/2026-09-24-适配DSH0.1.7图标改名与diff页签对齐-spec.md` | `docs/auto/2026-09-24-适配DSH0.1.7图标改名与diff页签对齐-plan.md` |
+| 2026-10-05 | 适配DSH0.2.x支持线依赖声明 | `docs/auto/2026-10-05-适配DSH0.2.x支持线依赖声明-spec.md` | `docs/auto/2026-10-05-适配DSH0.2.x支持线依赖声明-plan.md` |
